@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>VoltRide Katsina – Electric transport booking</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&display=swap">
+<style>
+:root{--surface:rgba(255,255,255,.92);--ink:#14182e;--muted:#5b6078;--line:#dfe2f0;--accent:#6a3df0;--accent-ink:#fff;--ok:#0b8a55;--bad:#c42b45;--land:#eaf6ee;--grid:#cfe5d6;--g1:#5b2bd9;--g2:#e5239b;--g3:#ff7a2f;--g4:#10b9a8;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--surface:rgba(22,24,48,.9);--ink:#eef0ff;--muted:#a3a8cc;--line:#32365e;--accent:#9b7bff;--accent-ink:#10112a;--ok:#46d79a;--bad:#ff7d93;--land:#1a2c30;--grid:#274047;--g1:#2a1672;--g2:#7a0f58;--g3:#8a3a14;--g4:#07635a;color-scheme:dark}}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
+body{margin:0;min-height:100%;color:var(--ink);font:16px/1.45 Sora,system-ui,sans-serif;background:linear-gradient(135deg,var(--g1),var(--g2) 40%,var(--g3) 70%,var(--g4)) fixed;overflow-x:hidden}
+.blob{position:fixed;border-radius:50%;filter:blur(55px);opacity:.55;z-index:0;animation:drift 16s ease-in-out infinite alternate}
+.b1{width:300px;height:300px;background:#ffd23f;top:-80px;left:-90px}
+.b2{width:340px;height:340px;background:#27e1c1;bottom:-120px;right:-100px;animation-delay:-6s}
+.b3{width:240px;height:240px;background:#ff5fa8;top:42%;left:55%;animation-delay:-11s}
+@keyframes drift{to{transform:translate(40px,-50px) scale(1.15)}}
+@media (prefers-reduced-motion:reduce){.blob{animation:none}}
+main{position:relative;z-index:1;max-width:540px;margin:0 auto;padding:20px 14px 48px}
+header{background:rgba(10,8,40,.5);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);color:#fff;border-radius:18px;padding:16px 18px;margin-bottom:14px}
+h1{font-size:25px;margin:0}
+header p{margin:2px 0 0;font-size:14px;color:#e6e8ff}
+nav{display:flex;gap:6px;background:var(--surface);border-radius:14px;padding:4px;margin-bottom:14px}
+nav button{flex:1;border:0;background:none;color:var(--muted);font:inherit;font-weight:600;padding:10px;border-radius:10px;cursor:pointer}
+nav button[aria-selected=true]{background:linear-gradient(90deg,var(--accent),#e5239b);color:#fff}
+.card{background:var(--surface);border-radius:18px;padding:14px;margin-bottom:12px;box-shadow:0 8px 28px rgba(20,10,60,.25)}
+label,.lab{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
+select{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.views{display:flex;gap:6px;margin-bottom:8px}
+.views button{flex:1;padding:8px 4px;border-radius:9px;border:1px solid var(--line);background:none;color:var(--ink);font:inherit;font-size:13px;cursor:pointer}
+.views button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+#map{width:100%;height:auto;display:block;border-radius:12px;background:var(--land)}
+.hint{font-size:13px;color:var(--muted);margin:8px 0 0}
+.pin{cursor:pointer}.pin:focus-visible circle{stroke:var(--accent);stroke-width:3}
+.veh{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.veh button{text-align:left;padding:12px;border-radius:12px;border:2px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;cursor:pointer}
+.veh button[aria-pressed=true]{border-color:var(--accent);box-shadow:0 0 0 3px rgba(106,61,240,.18)}
+.veh button:disabled{opacity:.45;cursor:not-allowed}
+.veh b{display:block}.veh small{color:var(--muted)}
+.sum div{display:flex;justify-content:space-between;padding:3px 0;font-size:14px}
+.sum .tot{border-top:1px solid var(--line);margin-top:6px;padding-top:10px;font-size:21px;font-weight:700}
+.cta{width:100%;padding:15px;border:0;border-radius:14px;background:linear-gradient(90deg,#ff7a2f,#e5239b);color:#fff;font:inherit;font-weight:700;font-size:16px;cursor:pointer;box-shadow:0 6px 18px rgba(229,35,155,.4)}
+.cta:disabled{opacity:.5;cursor:not-allowed;box-shadow:none}
+button:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.trip h3{margin:0 0 4px;font-size:16px}.trip p{margin:0;color:var(--muted);font-size:14px}
+.tag{display:inline-block;font-size:12px;font-weight:600;padding:2px 9px;border-radius:99px;border:1px solid currentColor;margin-bottom:8px}
+.tag.ok{color:var(--ok)}.tag.bad{color:var(--bad)}
+.cancel{margin-top:10px;background:none;border:1px solid var(--line);color:var(--bad);border-radius:9px;padding:8px 12px;font:inherit;cursor:pointer}
+.drv{margin-top:10px;padding:10px 12px;border-radius:12px;background:rgba(106,61,240,.1);display:flex;flex-direction:column;gap:2px;font-size:14px}
+.drv span{color:var(--muted)}
+.drv a{color:var(--accent);font-weight:700;text-decoration:none}
+.note{margin:10px 0 0;padding:10px 12px;border-radius:12px;background:rgba(10,8,40,.5);color:#fff;font-size:13px}
+.empty{text-align:center;color:#fff;padding:40px 10px;background:rgba(10,8,40,.5);border-radius:18px}
+#toast{position:fixed;z-index:5;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#14182e;color:#fff;padding:11px 18px;border-radius:99px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.on{opacity:1}
+</style>
+</head>
+<body>
+<div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+<main>
+  <header><h1>VoltRide Katsina</h1><p>Electric rides in Katsina city, Dutsin-Ma and between them.</p></header>
+  <nav role="tablist">
+    <button role="tab" id="t-book" aria-selected="true">Book a ride</button>
+    <button role="tab" id="t-trips" aria-selected="false">My trips (<span id="cnt">0</span>)</button>
+  </nav>
+
+  <section id="book">
+    <div class="card">
+      <div class="views" id="views">
+        <button data-v="all">Both towns</button><button data-v="kat">Katsina</button><button data-v="dut">Dutsin-Ma</button>
+      </div>
+      <svg id="map" viewBox="0 0 400 250" role="img" aria-label="Map of pickup and drop-off stops"></svg>
+      <p class="hint" id="hint"></p>
+      <div class="row">
+        <div><label for="from">Pickup</label><select id="from"></select></div>
+        <div><label for="to">Drop-off</label><select id="to"></select></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="lab" style="margin-top:0">Vehicle</div>
+      <div class="veh" id="veh"></div>
+      <div class="row">
+        <div><label for="when">Departure</label>
+          <select id="when"><option>Now</option><option>In 15 min</option><option>In 30 min</option><option>In 1 hour</option></select></div>
+        <div><label for="seats">Seats</label><select id="seats"></select></div>
+      </div>
+    </div>
+    <div class="card sum" id="sum"></div>
+    <button class="cta" id="go">Book ride</button>
+    <p class="note">After booking, your driver's name, phone number and plate appear in My trips. Share the trip details with someone you trust.</p>
+  </section>
+
+  <section id="trips" hidden></section>
+</main>
+<div id="toast" role="status"></div>
+
+<script>
+// NOTE: coordinates are approximate. Check and adjust them for your real pickup points.
+const S=[
+ {n:"Katsina City Centre",t:"kat",lat:12.9908,lng:7.6018},
+ {n:"Gobarau Minaret & Emir's Palace",t:"kat",lat:12.9893,lng:7.6014},
+ {n:"Katsina Central Motor Park",t:"kat",lat:12.9840,lng:7.6080},
+ {n:"Federal Medical Centre Katsina",t:"kat",lat:12.9810,lng:7.6130},
+ {n:"Muhammadu Dikko Stadium",t:"kat",lat:12.9930,lng:7.6120},
+ {n:"Umaru Musa Yar'Adua University",t:"kat",lat:12.9870,lng:7.5700},
+ {n:"Katsina Airport",t:"kat",lat:13.0196,lng:7.6609},
+ {n:"Dutsin-Ma Town Centre",t:"dut",lat:12.4540,lng:7.4950},
+ {n:"Dutsin-Ma Central Market",t:"dut",lat:12.4552,lng:7.4972},
+ {n:"Dutsin-Ma Motor Park",t:"dut",lat:12.4575,lng:7.4985},
+ {n:"Federal University Dutsin-Ma (FUDMA)",t:"dut",lat:12.4590,lng:7.4770},
+ {n:"Dutsin-Ma General Hospital",t:"dut",lat:12.4520,lng:7.5005},
+ {n:"Dutsin-Ma Emir's Palace",t:"dut",lat:12.4535,lng:7.4968}
+];
+const TOWN={kat:"Katsina",dut:"Dutsin-Ma"};
+const VEH=[
+ {id:"scooter",name:"E-scooter",seats:1,base:300,km:150,spd:15,max:6,note:"1 seat, up to 6 km"},
+ {id:"bike",name:"E-bike",seats:1,base:300,km:120,spd:20,max:12,note:"1 seat, up to 12 km"},
+ {id:"keke",name:"E-keke",seats:3,base:400,km:180,spd:25,max:20,note:"3 seats, up to 20 km"},
+ {id:"car",name:"E-car",seats:4,base:800,km:250,spd:45,max:999,note:"4 seats, any distance"},
+ {id:"shuttle",name:"E-shuttle",seats:12,base:500,km:100,spd:40,max:999,note:"Shared, per seat"}
+];
+// SAMPLE drivers. Replace names, phones and plates with your real, verified drivers.
+const DRIVERS={
+ scooter:[{name:"Nura Yahaya",phone:"0800 000 0101",plate:"Unit SC-01"},{name:"Hamza Shehu",phone:"0800 000 0102",plate:"Unit SC-02"}],
+ bike:[{name:"Bashir Isah",phone:"0800 000 0201",plate:"Unit EB-01"},{name:"Usman Kabir",phone:"0800 000 0202",plate:"Unit EB-02"}],
+ keke:[{name:"Musa Danjuma",phone:"0800 000 0301",plate:"KTN-301-KK"},{name:"Aminu Bello",phone:"0800 000 0302",plate:"KTN-302-KK"}],
+ car:[{name:"Abdullahi Sani",phone:"0800 000 0401",plate:"KTN-401-AA"},{name:"Ibrahim Lawal",phone:"0800 000 0402",plate:"KTN-402-AA"}],
+ shuttle:[{name:"Yusuf Garba",phone:"0800 000 0501",plate:"KTN-501-BS"},{name:"Sani Abubakar",phone:"0800 000 0502",plate:"KTN-502-BS"}]
+};
+let trips=[],sel="car",view="all",target="from";
+try{trips=JSON.parse(localStorage.getItem("voltride-ktn")||"[]")}catch(e){}
+const $=id=>document.getElementById(id);
+const save=()=>{try{localStorage.setItem("voltride-ktn",JSON.stringify(trips))}catch(e){}};
+const naira=n=>"₦"+(Math.round(n/10)*10).toLocaleString("en-NG");
+const rad=x=>x*Math.PI/180;
+function km(a,b){const A=S[a],B=S[b];const dl=rad(B.lat-A.lat),dg=rad(B.lng-A.lng);
+ const h=Math.sin(dl/2)**2+Math.cos(rad(A.lat))*Math.cos(rad(B.lat))*Math.sin(dg/2)**2;
+ return Math.max(.5,2*6371*Math.asin(Math.sqrt(h))*1.3)}
+const cur=()=>VEH.find(x=>x.id===sel);
+
+function fill(){
+ let o="";for(const t of ["kat","dut"])o+=`<optgroup label="${TOWN[t]}">`+S.map((s,i)=>s.t===t?`<option value="${i}">${s.n}</option>`:"").join("")+"</optgroup>";
+ $("from").innerHTML=o;$("to").innerHTML=o;$("from").value=0;$("to").value=7;
+}
+function calc(){
+ const f=+$("from").value,t=+$("to").value,d=km(f,t),x=cur();
+ const n=Math.min(+$("seats").value||1,x.seats),per=x.id==="shuttle";
+ const fare=(x.base+d*x.km)*(per?n:1);
+ return{f,t,d,x,n,fare,mins:Math.max(3,Math.round(d/x.spd*60)),same:f===t,far:d>x.max};
+}
+function autoView(){const f=S[+$("from").value],t=S[+$("to").value];view=f.t===t.t?f.t:"all"}
+
+function drawMap(){
+ const W=400,H=250,P=34,kx=.976;
+ const pts=view==="all"?S:S.filter(s=>s.t===view);
+ const xs=pts.map(p=>p.lng*kx),ys=pts.map(p=>p.lat);
+ const minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
+ const sc=Math.min((W-2*P)/Math.max(maxX-minX,.003),(H-2*P)/Math.max(maxY-minY,.003));
+ const cx=(minX+maxX)/2,cy=(minY+maxY)/2;
+ const X=p=>W/2+(p.lng*kx-cx)*sc,Y=p=>H/2-(p.lat-cy)*sc;
+ const f=+$("from").value,t=+$("to").value;
+ let g="";
+ for(let i=1;i<8;i++)g+=`<line x1="${i*50}" y1="0" x2="${i*50}" y2="${H}" stroke="var(--grid)" stroke-width="1"/>`;
+ for(let i=1;i<5;i++)g+=`<line x1="0" y1="${i*50}" x2="${W}" y2="${i*50}" stroke="var(--grid)" stroke-width="1"/>`;
+ if(view==="all"){
+  const a=S[0],b=S[7];
+  g+=`<path d="M${X(a)},${Y(a)} L${X(b)},${Y(b)}" stroke="#ff9a3d" stroke-width="3" stroke-dasharray="2 7" stroke-linecap="round"/>`;
+  g+=`<text x="${(X(a)+X(b))/2+10}" y="${(Y(a)+Y(b))/2}" font-size="10" fill="var(--muted)">Katsina – Dutsin-Ma road</text>`;
+  for(const k of ["kat","dut"]){const q=S.filter(s=>s.t===k);const cxp=q.reduce((s,p)=>s+X(p),0)/q.length,cyp=q.reduce((s,p)=>s+Y(p),0)/q.length;
+   g+=`<circle cx="${cxp}" cy="${cyp}" r="22" fill="#6a3df0" opacity=".15"/><text x="${cxp}" y="${cyp+(k==="kat"?-30:36)}" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">${TOWN[k]}</text>`}
+ }
+ if(f!==t)g+=`<line x1="${X(S[f])}" y1="${Y(S[f])}" x2="${X(S[t])}" y2="${Y(S[t])}" stroke="#e5239b" stroke-width="3" stroke-dasharray="7 5"/>`;
+ pts.forEach(p=>{const i=S.indexOf(p),x=X(p),y=Y(p),isF=i===f,isT=i===t;
+  const col=isF?"#10b981":isT?"#e5239b":"#6a3df0",r=isF||isT?9:6;
+  g+=`<g class="pin" data-i="${i}" tabindex="0" role="button" aria-label="${p.n}"><circle cx="${x}" cy="${y}" r="${r}" fill="${col}" stroke="#fff" stroke-width="2"/>`+
+   (isF||isT?`<text x="${x}" y="${y+3.5}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">${isF?"A":"B"}</text>`:"")+
+   (view!=="all"||isF||isT?`<text x="${x}" y="${y-r-4}" text-anchor="middle" font-size="9" font-weight="600" fill="var(--ink)" stroke="var(--land)" stroke-width="3" paint-order="stroke">${p.n.length>24?p.n.slice(0,22)+"…":p.n}</text>`:"")+`</g>`});
+ $("map").innerHTML=g;
+ $("hint").textContent=target==="from"?"Tap a pin to set your pickup (A).":"Now tap a pin for your drop-off (B).";
+ document.querySelectorAll("#views button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===view));
+}
+function render(){
+ const c=calc();
+ if(c.d>cur().max)sel="car";
+ const d=km(+$("from").value,+$("to").value);
+ $("veh").innerHTML=VEH.map(x=>{const off=d>x.max;
+  return `<button data-id="${x.id}" aria-pressed="${x.id===sel}" ${off?"disabled":""}><b>${x.name}</b><small>${off?"Too far for this vehicle":x.note}</small></button>`}).join("");
+ const s=$("seats"),keep=+s.value||1,x=cur();
+ s.innerHTML=Array.from({length:x.seats},(_,i)=>`<option>${i+1}</option>`).join("");
+ s.value=Math.min(keep,x.seats);s.disabled=x.seats===1;
+ const k=calc();
+ $("sum").innerHTML=k.same?`<div>Choose different pickup and drop-off stops.</div>`:
+  `<div><span>Route</span><span>${S[k.f].t===S[k.t].t?"Within "+TOWN[S[k.f].t]:"Katsina ↔ Dutsin-Ma"}</span></div>
+   <div><span>Distance (by road)</span><span>${k.d.toFixed(1)} km</span></div>
+   <div><span>Travel time</span><span>~${k.mins} min</span></div>
+   <div><span>Seats</span><span>${k.n}</span></div>
+   <div class="tot"><span>Fare</span><span>${naira(k.fare)}</span></div>`;
+ $("go").disabled=k.same||k.far;
+ drawMap();
+}
+function toast(m){const t=$("toast");t.textContent=m;t.classList.add("on");setTimeout(()=>t.classList.remove("on"),2400)}
+function showTrips(){
+ $("cnt").textContent=trips.filter(t=>t.status==="Confirmed").length;
+ $("trips").innerHTML=trips.length?trips.map(t=>`<div class="card trip"><span class="tag ${t.status==="Confirmed"?"ok":"bad"}">${t.status}</span>
+  <h3>${t.from} to ${t.to}</h3><p>${t.veh} · ${t.seats} seat${t.seats>1?"s":""} · ${t.when}</p>
+  <p>Ref ${t.ref} · ${t.fare}</p>${t.driver?`<div class="drv"><b>Driver: ${t.driver.name}</b><span>${t.driver.plate}</span>${t.status==="Confirmed"?`<a href="tel:${t.driver.phone.replace(/\s/g,"")}">Call ${t.driver.phone}</a>`:`<span>${t.driver.phone}</span>`}</div>`:""}${t.status==="Confirmed"?`<button class="cancel" data-ref="${t.ref}">Cancel trip</button>`:""}</div>`).join("")
+  :`<div class="empty">No trips yet. Book your first ride.</div>`;
+}
+function tab(n){$("book").hidden=n!=="book";$("trips").hidden=n!=="trips";
+ $("t-book").setAttribute("aria-selected",n==="book");$("t-trips").setAttribute("aria-selected",n==="trips")}
+function pick(i){
+ $(target).value=i;target=target==="from"?"to":"from";autoView();render();
+}
+$("t-book").onclick=()=>tab("book");$("t-trips").onclick=()=>{showTrips();tab("trips")};
+$("veh").onclick=e=>{const b=e.target.closest("button");if(b&&!b.disabled){sel=b.dataset.id;render()}};
+$("map").onclick=e=>{const p=e.target.closest("[data-i]");if(p)pick(+p.dataset.i)};
+$("map").onkeydown=e=>{if(e.key==="Enter"||e.key===" "){const p=e.target.closest("[data-i]");if(p){e.preventDefault();pick(+p.dataset.i)}}};
+$("views").onclick=e=>{const b=e.target.closest("button");if(b){view=b.dataset.v;drawMap()}};
+["from","to"].forEach(i=>$(i).onchange=()=>{autoView();render()});
+["seats","when"].forEach(i=>$(i).onchange=render);
+$("go").onclick=()=>{
+ const c=calc(),w=$("when");
+ const ref="VR"+Math.random().toString(36).slice(2,7).toUpperCase();
+ const dl=DRIVERS[c.x.id],dr=dl[Math.floor(Math.random()*dl.length)];
+ trips.unshift({ref,driver:dr,from:S[c.f].n,to:S[c.t].n,veh:c.x.name,seats:c.n,fare:naira(c.fare),when:w.options[w.selectedIndex].text,status:"Confirmed"});
+ save();showTrips();toast("Booked. Ref "+ref);tab("trips");
+};
+$("trips").onclick=e=>{const b=e.target.closest(".cancel");if(!b)return;
+ const t=trips.find(x=>x.ref===b.dataset.ref);if(t){t.status="Cancelled";save();showTrips();toast("Trip cancelled")}};
+fill();autoView();render();showTrips();
+</script>
+</body>
+</html>
