@@ -54,6 +54,16 @@ button:focus-visible,select:focus-visible{outline:3px solid var(--accent);outlin
 .note{margin:10px 0 0;padding:10px 12px;border-radius:12px;background:rgba(10,8,40,.5);color:#fff;font-size:13px}
 .empty{text-align:center;color:#fff;padding:40px 10px;background:rgba(10,8,40,.5);border-radius:18px}
 #toast{position:fixed;z-index:5;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#14182e;color:#fff;padding:11px 18px;border-radius:99px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s}
+.prog{display:flex;gap:4px;margin:2px 0 8px}.prog i{flex:1;height:5px;border-radius:9px;background:var(--line)}.prog i.on{background:linear-gradient(90deg,#10b981,#6a3df0)}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
+.actions .cancel{margin-top:0}
+.btn{display:block;text-align:center;padding:11px 14px;border-radius:12px;background:var(--accent);color:var(--accent-ink);font:inherit;font-weight:700;font-size:14px;text-decoration:none;border:0;cursor:pointer}
+.btn.red{background:#d7263d;color:#fff}.btn.wa{background:#25d366;color:#06240f}
+.rate button{border:0;background:none;font-size:22px;color:#f5a524;cursor:pointer;padding:0 2px}.rated{color:#f5a524;font-size:14px}
+input{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit}
+#sos{position:fixed;z-index:6;left:14px;bottom:calc(16px + env(safe-area-inset-bottom,0px));width:54px;height:54px;border-radius:50%;border:0;background:#d7263d;color:#fff;font:700 14px Sora,system-ui,sans-serif;box-shadow:0 6px 18px rgba(215,38,61,.5);cursor:pointer}
+.modal{position:fixed;inset:0;z-index:20;background:rgba(5,5,25,.6);display:flex;align-items:center;justify-content:center;padding:16px}.modal[hidden]{display:none}
+#lmap{height:250px;border-radius:12px;display:none;position:relative;z-index:0;isolation:isolate}
 #toast.on{opacity:1}
 </style>
 </head>
@@ -69,9 +79,10 @@ button:focus-visible,select:focus-visible{outline:3px solid var(--accent);outlin
   <section id="book">
     <div class="card">
       <div class="views" id="views">
-        <button data-v="all">Both towns</button><button data-v="kat">Katsina</button><button data-v="dut">Dutsin-Ma</button>
+        <button data-v="all">Both towns</button><button data-v="kat">Katsina</button><button data-v="dut">Dutsin-Ma</button><button data-v="osm">Street map</button>
       </div>
       <svg id="map" viewBox="0 0 400 250" role="img" aria-label="Map of pickup and drop-off stops"></svg>
+      <div id="lmap"></div>
       <p class="hint" id="hint"></p>
       <div class="row">
         <div><label for="from">Pickup</label><select id="from"></select></div>
@@ -94,6 +105,21 @@ button:focus-visible,select:focus-visible{outline:3px solid var(--accent);outlin
 
   <section id="trips" hidden></section>
 </main>
+<button id="sos" aria-label="Emergency SOS">SOS</button>
+<div class="modal" id="sosbox" hidden role="dialog" aria-modal="true" aria-label="Emergency help">
+ <div class="card" style="width:100%;max-width:420px">
+  <h3 style="margin:0 0 6px">Need help?</h3>
+  <p class="hint" style="margin:0 0 10px">Your emergency contact is saved on this phone only.</p>
+  <label for="ec" style="margin-top:0">Emergency contact phone</label>
+  <input id="ec" type="tel" inputmode="tel" placeholder="e.g. 08012345678">
+  <div class="actions" style="flex-direction:column;align-items:stretch">
+   <a class="btn red" href="tel:112">Call emergency services (112)</a>
+   <a class="btn" id="callec" href="#">Call my contact</a>
+   <a class="btn" id="smsec" href="#">Text my contact my trip</a>
+   <button class="btn" id="sosx" style="background:none;color:var(--ink);border:1px solid var(--line)">Close</button>
+  </div>
+ </div>
+</div>
 <div id="toast" role="status"></div>
 
 <script>
@@ -150,9 +176,12 @@ function calc(){
  const fare=(x.base+d*x.km)*(per?n:1);
  return{f,t,d,x,n,fare,mins:Math.max(3,Math.round(d/x.spd*60)),same:f===t,far:d>x.max};
 }
-function autoView(){const f=S[+$("from").value],t=S[+$("to").value];view=f.t===t.t?f.t:"all"}
+function autoView(){if(view==="osm")return;const f=S[+$("from").value],t=S[+$("to").value];view=f.t===t.t?f.t:"all"}
 
 function drawMap(){
+ const osm=view==="osm";$("lmap").style.display=osm?"block":"none";$("map").style.display=osm?"none":"block";
+ document.querySelectorAll("#views button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===view));
+ if(osm){$("hint").textContent="Tap a dot to set "+(target==="from"?"pickup (A)":"drop-off (B)")+".";drawOsm();return}
  const W=400,H=250,P=34,kx=.976;
  const pts=view==="all"?S:S.filter(s=>s.t===view);
  const xs=pts.map(p=>p.lng*kx),ys=pts.map(p=>p.lat);
@@ -201,11 +230,57 @@ function render(){
  drawMap();
 }
 function toast(m){const t=$("toast");t.textContent=m;t.classList.add("on");setTimeout(()=>t.classList.remove("on"),2400)}
+const STAGES=["Driver assigned","Driver arriving","Trip in progress","Completed"];
+// Demo: stages advance by timer (1 trip minute = 6 seconds). A real system needs a backend.
+function stageOf(t){if(!t.t0)return{i:3,label:STAGES[3]};
+ const s=(Date.now()-t.t0)/1000,m=(t.mins||5)*6,i=s<12?0:s<30?1:s<30+m?2:3;return{i,label:STAGES[i]}}
+function progress(t){const i=stageOf(t).i;return `<div class="prog" aria-hidden="true">${STAGES.map((_,k)=>`<i class="${k<=i?"on":""}"></i>`).join("")}</div>`}
+function shareMsg(t){return `I'm on a VoltRide Katsina trip.\n${t.from} to ${t.to}\n${t.veh}, ref ${t.ref}\nDriver: ${t.driver.name}, ${t.driver.phone}, ${t.driver.plate}`}
+function actions(t){
+ if(t.status!=="Confirmed")return "";
+ const i=stageOf(t).i;
+ let h=`<div class="actions">`;
+ if(t.driver)h+=`<a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(shareMsg(t))}">Share on WhatsApp</a>`;
+ if(i<2)h+=`<button class="cancel" data-ref="${t.ref}">Cancel trip</button>`;
+ if(i===3)h+=t.rating?`<span class="rated">You rated ${"★".repeat(t.rating)}</span>`:`<span class="rate">Rate: ${[1,2,3,4,5].map(n=>`<button data-rate="${n}" data-ref="${t.ref}" aria-label="${n} stars">★</button>`).join("")}</span>`;
+ return h+"</div>"}
+let lmap,lgrp,myLoc;
+function loadLeaflet(cb){
+ if(window.L)return cb(true);
+ const l=document.createElement("link");l.rel="stylesheet";l.href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css";document.head.appendChild(l);
+ const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js";s.onload=()=>cb(true);s.onerror=()=>cb(false);document.head.appendChild(s);
+}
+function drawOsm(){
+ loadLeaflet(ok=>{
+  if(!ok){toast("Street map couldn't load. Showing simple map.");view="all";drawMap();return}
+  if(view!=="osm")return;
+  if(!lmap){lmap=L.map($("lmap")).setView([12.99,7.6],12);
+   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap contributors"}).addTo(lmap);lgrp=L.layerGroup().addTo(lmap)}
+  lgrp.clearLayers();const f=+$("from").value,t=+$("to").value;
+  S.forEach((p,i)=>{const isF=i===f,isT=i===t;
+   L.circleMarker([p.lat,p.lng],{radius:isF||isT?10:7,color:"#fff",weight:2,fillColor:isF?"#10b981":isT?"#e5239b":"#6a3df0",fillOpacity:1}).bindTooltip(p.n).on("click",()=>pick(i)).addTo(lgrp)});
+  if(f!==t)L.polyline([[S[f].lat,S[f].lng],[S[t].lat,S[t].lng]],{color:"#e5239b",dashArray:"7 5"}).addTo(lgrp);
+  lmap.invalidateSize();lmap.fitBounds([[S[f].lat,S[f].lng],[S[t].lat,S[t].lng]],{padding:[30,30],maxZoom:15});
+ })
+}
+function sosLinks(){
+ const ec=($("ec").value||"").replace(/[^\d+]/g,"");
+ try{localStorage.setItem("voltride-ec",ec)}catch(e){}
+ const t=trips.find(x=>x.status==="Confirmed"&&x.driver);
+ const body="I need help."+(t?" "+shareMsg(t).replace(/\n/g," | "):"")+(myLoc?" My location: https://maps.google.com/?q="+myLoc:"");
+ $("callec").href=ec?"tel:"+ec:"#";$("smsec").href=ec?"sms:"+ec+"?&body="+encodeURIComponent(body):"#";
+ $("callec").style.opacity=$("smsec").style.opacity=ec?1:.45;
+}
+$("sos").onclick=()=>{
+ try{$("ec").value=localStorage.getItem("voltride-ec")||""}catch(e){}
+ if(navigator.geolocation)navigator.geolocation.getCurrentPosition(p=>{myLoc=p.coords.latitude+","+p.coords.longitude;sosLinks()},()=>{},{timeout:6000});
+ sosLinks();$("sosbox").hidden=false};
+$("ec").oninput=sosLinks;$("sosx").onclick=()=>{$("sosbox").hidden=true};
 function showTrips(){
  $("cnt").textContent=trips.filter(t=>t.status==="Confirmed").length;
- $("trips").innerHTML=trips.length?trips.map(t=>`<div class="card trip"><span class="tag ${t.status==="Confirmed"?"ok":"bad"}">${t.status}</span>
+ $("trips").innerHTML=trips.length?trips.map(t=>`<div class="card trip"><span class="tag ${t.status==="Confirmed"?"ok":"bad"}">${t.status==="Confirmed"?stageOf(t).label:t.status}</span>${t.status==="Confirmed"?progress(t):""}
   <h3>${t.from} to ${t.to}</h3><p>${t.veh} · ${t.seats} seat${t.seats>1?"s":""} · ${t.when}</p>
-  <p>Ref ${t.ref} · ${t.fare}</p>${t.driver?`<div class="drv"><b>Driver: ${t.driver.name}</b><span>${t.driver.plate}</span>${t.status==="Confirmed"?`<a href="tel:${t.driver.phone.replace(/\s/g,"")}">Call ${t.driver.phone}</a>`:`<span>${t.driver.phone}</span>`}</div>`:""}${t.status==="Confirmed"?`<button class="cancel" data-ref="${t.ref}">Cancel trip</button>`:""}</div>`).join("")
+  <p>Ref ${t.ref} · ${t.fare}</p>${t.driver?`<div class="drv"><b>Driver: ${t.driver.name}</b><span>${t.driver.plate}</span>${t.status==="Confirmed"?`<a href="tel:${t.driver.phone.replace(/\s/g,"")}">Call ${t.driver.phone}</a>`:`<span>${t.driver.phone}</span>`}</div>`:""}${actions(t)}</div>`).join("")
   :`<div class="empty">No trips yet. Book your first ride.</div>`;
 }
 function tab(n){$("book").hidden=n!=="book";$("trips").hidden=n!=="trips";
@@ -224,12 +299,14 @@ $("go").onclick=()=>{
  const c=calc(),w=$("when");
  const ref="VR"+Math.random().toString(36).slice(2,7).toUpperCase();
  const dl=DRIVERS[c.x.id],dr=dl[Math.floor(Math.random()*dl.length)];
- trips.unshift({ref,driver:dr,from:S[c.f].n,to:S[c.t].n,veh:c.x.name,seats:c.n,fare:naira(c.fare),when:w.options[w.selectedIndex].text,status:"Confirmed"});
+ trips.unshift({ref,t0:Date.now(),mins:c.mins,driver:dr,from:S[c.f].n,to:S[c.t].n,veh:c.x.name,seats:c.n,fare:naira(c.fare),when:w.options[w.selectedIndex].text,status:"Confirmed"});
  save();showTrips();toast("Booked. Ref "+ref);tab("trips");
 };
-$("trips").onclick=e=>{const b=e.target.closest(".cancel");if(!b)return;
+$("trips").onclick=e=>{const r=e.target.closest("[data-rate]");if(r){const t=trips.find(x=>x.ref===r.dataset.ref);if(t){t.rating=+r.dataset.rate;save();showTrips();toast("Thanks for rating")}return}
+ const b=e.target.closest(".cancel");if(!b)return;
  const t=trips.find(x=>x.ref===b.dataset.ref);if(t){t.status="Cancelled";save();showTrips();toast("Trip cancelled")}};
 fill();autoView();render();showTrips();
+setInterval(()=>{if(!$("trips").hidden&&trips.some(t=>t.status==="Confirmed"))showTrips()},3000);
 </script>
 </body>
 </html>
