@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>VoltRide Katsina – Electric transport booking</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <style>
 :root{--surface:rgba(255,255,255,.92);--ink:#14182e;--muted:#5b6078;--line:#dfe2f0;--accent:#6a3df0;--accent-ink:#fff;--ok:#0b8a55;--bad:#c42b45;--land:#eaf6ee;--grid:#cfe5d6;--g1:#5b2bd9;--g2:#e5239b;--g3:#ff7a2f;--g4:#10b9a8;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--surface:rgba(22,24,48,.9);--ink:#eef0ff;--muted:#a3a8cc;--line:#32365e;--accent:#9b7bff;--accent-ink:#10112a;--ok:#46d79a;--bad:#ff7d93;--land:#1a2c30;--grid:#274047;--g1:#2a1672;--g2:#7a0f58;--g3:#8a3a14;--g4:#07635a;color-scheme:dark}}
@@ -65,15 +66,19 @@ input{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);ba
 .modal{position:fixed;inset:0;z-index:20;background:rgba(5,5,25,.6);display:flex;align-items:center;justify-content:center;padding:16px}.modal[hidden]{display:none}
 #lmap{height:250px;border-radius:12px;display:none;position:relative;z-index:0;isolation:isolate}
 #toast.on{opacity:1}
+[hidden]{display:none!important}
+nav button{font-size:13px;padding:10px 4px}
 </style>
 </head>
 <body>
 <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
 <main>
-  <header><h1>VoltRide Katsina</h1><p>Electric rides in Katsina city, Dutsin-Ma and between them.</p></header>
-  <nav role="tablist">
+  <header><h1>VoltRide Katsina</h1><p>Electric rides in Katsina city, Dutsin-Ma and between them.</p><p id="who"></p></header>
+  <nav role="tablist" id="nav" hidden>
     <button role="tab" id="t-book" aria-selected="true">Book a ride</button>
     <button role="tab" id="t-trips" aria-selected="false">My trips (<span id="cnt">0</span>)</button>
+    <button role="tab" id="t-drive" aria-selected="false" hidden>Drive</button>
+    <button role="tab" id="t-admin" aria-selected="false" hidden>Admin</button>
   </nav>
 
   <section id="book">
@@ -104,6 +109,26 @@ input{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);ba
   </section>
 
   <section id="trips" hidden></section>
+  <section id="drive" hidden></section>
+  <section id="admin" hidden></section>
+  <section id="auth" hidden>
+   <div class="card">
+    <div class="views"><button id="m-in" aria-pressed="true">Sign in</button><button id="m-up" aria-pressed="false">Create account</button></div>
+    <div id="upf" hidden>
+     <label for="a-name">Full name</label><input id="a-name" autocomplete="name">
+     <label for="a-phone">Phone number</label><input id="a-phone" type="tel" inputmode="tel" autocomplete="tel">
+     <label for="a-role">I am a</label><select id="a-role"><option value="rider">Rider</option><option value="driver">Driver</option></select>
+     <div id="drvf" hidden>
+      <label for="a-veh">Vehicle type</label><select id="a-veh"><option>E-scooter</option><option>E-bike</option><option>E-keke</option><option>E-car</option><option>E-shuttle</option></select>
+      <label for="a-plate">Plate number</label><input id="a-plate">
+     </div>
+    </div>
+    <label for="a-email">Email</label><input id="a-email" type="email" autocomplete="email">
+    <label for="a-pass">Password (6+ characters)</label><input id="a-pass" type="password" autocomplete="current-password">
+    <p class="hint" id="a-msg" role="alert"></p>
+    <button class="cta" id="a-go" style="margin-top:12px">Sign in</button>
+   </div>
+  </section>
 </main>
 <button id="sos" aria-label="Emergency SOS">SOS</button>
 <div class="modal" id="sosbox" hidden role="dialog" aria-modal="true" aria-label="Emergency help">
@@ -147,18 +172,14 @@ const VEH=[
  {id:"car",name:"E-car",seats:4,base:800,km:250,spd:45,max:999,note:"4 seats, any distance"},
  {id:"shuttle",name:"E-shuttle",seats:12,base:500,km:100,spd:40,max:999,note:"Shared, per seat"}
 ];
-// SAMPLE drivers. Replace names, phones and plates with your real, verified drivers.
-const DRIVERS={
- scooter:[{name:"Nura Yahaya",phone:"0800 000 0101",plate:"Unit SC-01"},{name:"Hamza Shehu",phone:"0800 000 0102",plate:"Unit SC-02"}],
- bike:[{name:"Bashir Isah",phone:"0800 000 0201",plate:"Unit EB-01"},{name:"Usman Kabir",phone:"0800 000 0202",plate:"Unit EB-02"}],
- keke:[{name:"Musa Danjuma",phone:"0800 000 0301",plate:"KTN-301-KK"},{name:"Aminu Bello",phone:"0800 000 0302",plate:"KTN-302-KK"}],
- car:[{name:"Abdullahi Sani",phone:"0800 000 0401",plate:"KTN-401-AA"},{name:"Ibrahim Lawal",phone:"0800 000 0402",plate:"KTN-402-AA"}],
- shuttle:[{name:"Yusuf Garba",phone:"0800 000 0501",plate:"KTN-501-BS"},{name:"Sani Abubakar",phone:"0800 000 0502",plate:"KTN-502-BS"}]
-};
-let trips=[],sel="car",view="all",target="from";
-try{trips=JSON.parse(localStorage.getItem("voltride-ktn")||"[]")}catch(e){}
+let trips=[],allTrips=[],sel="car",view="all",target="from",me=null,sb=null;
 const $=id=>document.getElementById(id);
-const save=()=>{try{localStorage.setItem("voltride-ktn",JSON.stringify(trips))}catch(e){}};
+// Paste your Supabase Project URL and anon (publishable) key here. Never use the service_role key.
+const SUPABASE_URL="https://odisbttarupoyezcihch.supabase.co";
+const SUPABASE_KEY="sb_publishable_Q7OrQFEb2L2oDbOzr9KFzw_0yXB_Y38";
+const READY=SUPABASE_URL.startsWith("https://")&&!SUPABASE_KEY.startsWith("PASTE");
+if(READY)sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const naira=n=>"₦"+(Math.round(n/10)*10).toLocaleString("en-NG");
 const rad=x=>x*Math.PI/180;
 function km(a,b){const A=S[a],B=S[b];const dl=rad(B.lat-A.lat),dg=rad(B.lng-A.lng);
@@ -230,19 +251,18 @@ function render(){
  drawMap();
 }
 function toast(m){const t=$("toast");t.textContent=m;t.classList.add("on");setTimeout(()=>t.classList.remove("on"),2400)}
-const STAGES=["Driver assigned","Driver arriving","Trip in progress","Completed"];
-// Demo: stages advance by timer (1 trip minute = 6 seconds). A real system needs a backend.
-function stageOf(t){if(!t.t0)return{i:3,label:STAGES[3]};
- const s=(Date.now()-t.t0)/1000,m=(t.mins||5)*6,i=s<12?0:s<30?1:s<30+m?2:3;return{i,label:STAGES[i]}}
+const STAGES=["Finding a driver","Driver accepted","Trip in progress","Completed"];
+const IDX={requested:0,accepted:1,in_progress:2,completed:3};
+const LABEL={requested:"Finding a driver",accepted:"Driver accepted",in_progress:"Trip in progress",completed:"Completed",cancelled:"Cancelled"};
+const stageOf=t=>({i:IDX[t.status]??0,label:LABEL[t.status]});
 function progress(t){const i=stageOf(t).i;return `<div class="prog" aria-hidden="true">${STAGES.map((_,k)=>`<i class="${k<=i?"on":""}"></i>`).join("")}</div>`}
 function shareMsg(t){return `I'm on a VoltRide Katsina trip.\n${t.from} to ${t.to}\n${t.veh}, ref ${t.ref}\nDriver: ${t.driver.name}, ${t.driver.phone}, ${t.driver.plate}`}
 function actions(t){
- if(t.status!=="Confirmed")return "";
- const i=stageOf(t).i;
+ const i=IDX[t.status];if(i===undefined)return "";
  let h=`<div class="actions">`;
- if(t.driver)h+=`<a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(shareMsg(t))}">Share on WhatsApp</a>`;
- if(i<2)h+=`<button class="cancel" data-ref="${t.ref}">Cancel trip</button>`;
- if(i===3)h+=t.rating?`<span class="rated">You rated ${"★".repeat(t.rating)}</span>`:`<span class="rate">Rate: ${[1,2,3,4,5].map(n=>`<button data-rate="${n}" data-ref="${t.ref}" aria-label="${n} stars">★</button>`).join("")}</span>`;
+ if(t.driver&&i<3)h+=`<a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(shareMsg(t))}">Share on WhatsApp</a>`;
+ if(i<2)h+=`<button class="cancel" data-ref="${t.id}">Cancel trip</button>`;
+ if(i===3)h+=t.rating?`<span class="rated">You rated ${"★".repeat(t.rating)}</span>`:`<span class="rate">Rate: ${[1,2,3,4,5].map(n=>`<button data-rate="${n}" data-ref="${t.id}" aria-label="${n} stars">★</button>`).join("")}</span>`;
  return h+"</div>"}
 let lmap,lgrp,myLoc;
 function loadLeaflet(cb){
@@ -266,7 +286,7 @@ function drawOsm(){
 function sosLinks(){
  const ec=($("ec").value||"").replace(/[^\d+]/g,"");
  try{localStorage.setItem("voltride-ec",ec)}catch(e){}
- const t=trips.find(x=>x.status==="Confirmed"&&x.driver);
+ const t=trips.find(x=>x.driver&&["accepted","in_progress"].includes(x.status));
  const body="I need help."+(t?" "+shareMsg(t).replace(/\n/g," | "):"")+(myLoc?" My location: https://maps.google.com/?q="+myLoc:"");
  $("callec").href=ec?"tel:"+ec:"#";$("smsec").href=ec?"sms:"+ec+"?&body="+encodeURIComponent(body):"#";
  $("callec").style.opacity=$("smsec").style.opacity=ec?1:.45;
@@ -277,36 +297,118 @@ $("sos").onclick=()=>{
  sosLinks();$("sosbox").hidden=false};
 $("ec").oninput=sosLinks;$("sosx").onclick=()=>{$("sosbox").hidden=true};
 function showTrips(){
- $("cnt").textContent=trips.filter(t=>t.status==="Confirmed").length;
- $("trips").innerHTML=trips.length?trips.map(t=>`<div class="card trip"><span class="tag ${t.status==="Confirmed"?"ok":"bad"}">${t.status==="Confirmed"?stageOf(t).label:t.status}</span>${t.status==="Confirmed"?progress(t):""}
-  <h3>${t.from} to ${t.to}</h3><p>${t.veh} · ${t.seats} seat${t.seats>1?"s":""} · ${t.when}</p>
-  <p>Ref ${t.ref} · ${t.fare}</p>${t.driver?`<div class="drv"><b>Driver: ${t.driver.name}</b><span>${t.driver.plate}</span>${t.status==="Confirmed"?`<a href="tel:${t.driver.phone.replace(/\s/g,"")}">Call ${t.driver.phone}</a>`:`<span>${t.driver.phone}</span>`}</div>`:""}${actions(t)}</div>`).join("")
+ $("cnt").textContent=trips.filter(t=>!["completed","cancelled"].includes(t.status)).length;
+ $("trips").innerHTML=trips.length?trips.map(t=>{const done=t.status==="completed"||t.status==="cancelled";return `<div class="card trip"><span class="tag ${t.status==="cancelled"?"bad":"ok"}">${LABEL[t.status]}</span>${t.status==="cancelled"?"":progress(t)}
+  <h3>${esc(t.from)} to ${esc(t.to)}</h3><p>${esc(t.veh)} · ${t.seats} seat${t.seats>1?"s":""} · ${esc(t.when)}</p>
+  <p>Ref ${esc(t.ref)} · ${t.fare}</p>${t.driver?`<div class="drv"><b>Driver: ${esc(t.driver.name)}</b><span>${esc(t.driver.plate)}</span>${done?`<span>${esc(t.driver.phone)}</span>`:`<a href="tel:${esc(t.driver.phone).replace(/\s/g,"")}">Call ${esc(t.driver.phone)}</a>`}</div>`:t.status==="requested"?`<p>Waiting for a driver to accept…</p>`:""}${actions(t)}</div>`}).join("")
   :`<div class="empty">No trips yet. Book your first ride.</div>`;
 }
-function tab(n){$("book").hidden=n!=="book";$("trips").hidden=n!=="trips";
- $("t-book").setAttribute("aria-selected",n==="book");$("t-trips").setAttribute("aria-selected",n==="trips")}
+const TSEL="*,driver:profiles!driver_id(full_name,phone,plate,vehicle),rider:profiles!rider_id(full_name,phone)";
+const mapTrip=r=>({id:r.id,ref:r.ref,riderId:r.rider_id,driverId:r.driver_id,from:r.from_stop,to:r.to_stop,veh:r.vehicle,seats:r.seats,fare:naira(r.fare),when:r.depart,status:r.status,rating:r.rating,
+ driver:r.driver?{name:r.driver.full_name,phone:r.driver.phone,plate:r.driver.plate}:null,rider:r.rider});
+async function load(){
+ if(!me)return;
+ if(me.role==="driver"&&!me.approved){const {data:p}=await sb.from("profiles").select("approved").eq("id",me.id).single();if(p)me.approved=p.approved}
+ const {data,error}=await sb.from("trips").select(TSEL).order("created_at",{ascending:false});
+ if(error)return;
+ allTrips=data.map(mapTrip);trips=allTrips.filter(t=>t.riderId===me.id);
+ showTrips();
+ if(me.role==="driver")showDrive();
+ if(me.role==="admin")await showAdmin();
+}
+function showDrive(){
+ if(!me.approved){$("drive").innerHTML=`<div class="empty">Your driver account is waiting for approval by the admin.</div>`;return}
+ const mine=allTrips.filter(t=>t.driverId===me.id&&["accepted","in_progress"].includes(t.status));
+ const q=allTrips.filter(t=>t.status==="requested"&&!t.driverId&&t.veh===me.vehicle);
+ const card=(t,b)=>`<div class="card trip"><h3>${esc(t.from)} to ${esc(t.to)}</h3><p>${t.seats} seat${t.seats>1?"s":""} · ${t.fare} · ${esc(t.when)}</p>${t.driverId&&t.rider?`<p>Rider: ${esc(t.rider.full_name)}</p>`:""}<div class="actions">${t.driverId&&t.rider?`<a class="btn" href="tel:${esc(t.rider.phone).replace(/\s/g,"")}">Call rider</a>`:""}${b}</div></div>`;
+ $("drive").innerHTML=(mine.length?`<h3 style="color:#fff">Your trips</h3>`+mine.map(t=>card(t,`<button class="btn" data-id="${t.id}" data-act="${t.status==="accepted"?"start":"done"}">${t.status==="accepted"?"Start trip":"Complete trip"}</button>`)).join(""):"")+
+  `<h3 style="color:#fff">Ride requests (${esc(me.vehicle)})</h3>`+(q.length?q.map(t=>card(t,`<button class="btn" data-id="${t.id}" data-act="accept">Accept</button>`)).join(""):`<div class="empty">No requests right now.</div>`);
+}
+async function showAdmin(){
+ const {data,error}=await sb.from("profiles").select("*").eq("role","driver").order("created_at",{ascending:false});
+ if(error)return;
+ const n=s=>allTrips.filter(t=>t.status===s).length;
+ $("admin").innerHTML=`<div class="card sum"><div><span>Requested</span><span>${n("requested")}</span></div><div><span>Active</span><span>${n("accepted")+n("in_progress")}</span></div><div><span>Completed</span><span>${n("completed")}</span></div></div>`+
+ (data.length?data.map(d=>`<div class="card trip"><span class="tag ${d.approved?"ok":"bad"}">${d.approved?"Approved":"Pending"}</span><h3>${esc(d.full_name)}</h3><p>${esc(d.vehicle)} · ${esc(d.plate)} · ${esc(d.phone)}</p><div class="actions"><button class="btn" data-id="${d.id}" data-ok="${!d.approved}">${d.approved?"Revoke":"Approve"}</button></div></div>`).join(""):`<div class="empty">No drivers have signed up yet.</div>`);
+}
+async function enter(){
+ const {data:{user}}=await sb.auth.getUser();
+ const {data:p}=user?await sb.from("profiles").select("*").eq("id",user.id).single():{data:null};
+ if(!p){await sb.auth.signOut();$("a-msg").textContent="Couldn't load your profile. Please sign in again.";show("auth");return}
+ me=p;
+ $("who").innerHTML=`Signed in as ${esc(me.full_name)} (${me.role}) · <button id="out" style="background:none;border:0;color:#fff;text-decoration:underline;font:inherit;cursor:pointer;padding:0">Sign out</button>`;
+ $("out").onclick=async()=>{await sb.auth.signOut();me=null;trips=[];allTrips=[];$("who").textContent="";show("auth")};
+ $("t-drive").hidden=me.role!=="driver";$("t-admin").hidden=me.role!=="admin";
+ show("book");await load();
+}
+async function boot(){
+ if(!READY){show("auth");$("a-msg").textContent="Setup needed: add your Supabase URL and key at the top of the script.";return}
+ const {data}=await sb.auth.getSession();
+ if(data.session)await enter();else show("auth");
+}
+function show(n){
+ ["auth","book","trips","drive","admin"].forEach(s=>$(s).hidden=s!==n);
+ $("nav").hidden=n==="auth";
+ [["book","t-book"],["trips","t-trips"],["drive","t-drive"],["admin","t-admin"]].forEach(([s,b])=>$(b).setAttribute("aria-selected",s===n));
+}
 function pick(i){
  $(target).value=i;target=target==="from"?"to":"from";autoView();render();
 }
-$("t-book").onclick=()=>tab("book");$("t-trips").onclick=()=>{showTrips();tab("trips")};
+[["t-book","book"],["t-trips","trips"],["t-drive","drive"],["t-admin","admin"]].forEach(([b,s])=>$(b).onclick=()=>show(s));
 $("veh").onclick=e=>{const b=e.target.closest("button");if(b&&!b.disabled){sel=b.dataset.id;render()}};
 $("map").onclick=e=>{const p=e.target.closest("[data-i]");if(p)pick(+p.dataset.i)};
 $("map").onkeydown=e=>{if(e.key==="Enter"||e.key===" "){const p=e.target.closest("[data-i]");if(p){e.preventDefault();pick(+p.dataset.i)}}};
 $("views").onclick=e=>{const b=e.target.closest("button");if(b){view=b.dataset.v;drawMap()}};
 ["from","to"].forEach(i=>$(i).onchange=()=>{autoView();render()});
 ["seats","when"].forEach(i=>$(i).onchange=render);
-$("go").onclick=()=>{
+$("go").onclick=async()=>{
  const c=calc(),w=$("when");
  const ref="VR"+Math.random().toString(36).slice(2,7).toUpperCase();
- const dl=DRIVERS[c.x.id],dr=dl[Math.floor(Math.random()*dl.length)];
- trips.unshift({ref,t0:Date.now(),mins:c.mins,driver:dr,from:S[c.f].n,to:S[c.t].n,veh:c.x.name,seats:c.n,fare:naira(c.fare),when:w.options[w.selectedIndex].text,status:"Confirmed"});
- save();showTrips();toast("Booked. Ref "+ref);tab("trips");
+ $("go").disabled=true;
+ const {error}=await sb.from("trips").insert({ref,rider_id:me.id,from_stop:S[c.f].n,to_stop:S[c.t].n,vehicle:c.x.name,seats:c.n,fare:Math.round(c.fare/10)*10,depart:w.options[w.selectedIndex].text});
+ $("go").disabled=false;
+ if(error){toast("Booking failed. Try again.");return}
+ await load();toast("Requested. Ref "+ref);show("trips");
 };
-$("trips").onclick=e=>{const r=e.target.closest("[data-rate]");if(r){const t=trips.find(x=>x.ref===r.dataset.ref);if(t){t.rating=+r.dataset.rate;save();showTrips();toast("Thanks for rating")}return}
- const b=e.target.closest(".cancel");if(!b)return;
- const t=trips.find(x=>x.ref===b.dataset.ref);if(t){t.status="Cancelled";save();showTrips();toast("Trip cancelled")}};
-fill();autoView();render();showTrips();
-setInterval(()=>{if(!$("trips").hidden&&trips.some(t=>t.status==="Confirmed"))showTrips()},3000);
+$("trips").onclick=async e=>{
+ const r=e.target.closest("[data-rate]"),b=e.target.closest(".cancel");let res;
+ if(r)res=await sb.from("trips").update({rating:+r.dataset.rate}).eq("id",r.dataset.ref);
+ else if(b)res=await sb.from("trips").update({status:"cancelled"}).eq("id",b.dataset.ref);
+ else return;
+ toast(res.error?"Couldn't update the trip.":r?"Thanks for rating":"Trip cancelled");await load();
+};
+$("drive").onclick=async e=>{
+ const b=e.target.closest("[data-act]");if(!b)return;
+ const id=b.dataset.id,a=b.dataset.act;b.disabled=true;let r;
+ if(a==="accept")r=await sb.from("trips").update({driver_id:me.id,status:"accepted"}).eq("id",id).eq("status","requested").is("driver_id",null).select();
+ else r=await sb.from("trips").update({status:a==="start"?"in_progress":"completed"}).eq("id",id).eq("driver_id",me.id).select();
+ if(r.error||!r.data.length)toast(a==="accept"?"Another driver took this ride.":"Couldn't update the trip.");
+ await load();
+};
+$("admin").onclick=async e=>{
+ const b=e.target.closest("[data-ok]");if(!b)return;b.disabled=true;
+ const {error}=await sb.rpc("approve_driver",{p_id:b.dataset.id,p_ok:b.dataset.ok==="true"});
+ if(error)toast("Couldn't update the driver.");await load();
+};
+function authMode(up){$("upf").hidden=!up;$("m-in").setAttribute("aria-pressed",!up);$("m-up").setAttribute("aria-pressed",up);$("a-go").textContent=up?"Create account":"Sign in";$("a-msg").textContent=""}
+$("m-in").onclick=()=>authMode(false);$("m-up").onclick=()=>authMode(true);
+$("a-role").onchange=()=>{$("drvf").hidden=$("a-role").value!=="driver"};
+$("a-go").onclick=async()=>{
+ const up=!$("upf").hidden,msg=$("a-msg");msg.textContent="";
+ if(!READY){msg.textContent="Setup needed: add your Supabase URL and key at the top of the script.";return}
+ const email=$("a-email").value.trim(),password=$("a-pass").value;let r;
+ if(up){
+  const role=$("a-role").value,name=$("a-name").value.trim(),phone=$("a-phone").value.trim(),plate=$("a-plate").value.trim();
+  if(!name||!phone){msg.textContent="Enter your name and phone number.";return}
+  if(role==="driver"&&!plate){msg.textContent="Enter your plate number.";return}
+  r=await sb.auth.signUp({email,password,options:{data:{full_name:name,phone,role,vehicle:$("a-veh").value,plate}}});
+ }else r=await sb.auth.signInWithPassword({email,password});
+ if(r.error){msg.textContent=r.error.message;return}
+ if(!r.data.session){msg.textContent="Check your email to confirm, then sign in.";return}
+ await enter();
+};
+fill();autoView();render();boot();
+setInterval(()=>{if(me&&!document.hidden)load()},5000);
 </script>
 </body>
 </html>
